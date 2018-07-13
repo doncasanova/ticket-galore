@@ -1,102 +1,31 @@
 const GoogleStrategy = require('passport-google-oauth2').Strategy;
+const passport = require('passport');
+const router = require('express').Router();
 const Users = require('../controllers/user-data');
-const querystring = require('querystring');
-const url = require('url');
+const User = require('../models/user');
+
+// const querystring = require('querystring');
+// const url = require('url');
 //const express = require('express');
 //const session = require('express-session');
-const path = require('path');
+
 // console.log(process.env.CLIENT_ID);
 
-module.exports = (app, passport) => {
+// module.exports = (passport) => {
 
-  app.get('/auth/google/callback',
+  router.get('/auth/google/callback',
     passport.authenticate('google', {
-      failureRedirect: '/signin'
+      failureRedirect: '/auth/signin'
     }), (req, res) => {
       // req.session.token = req.user.token;
       // console.log('user token ', req.user.token);
-      console.log('user profile ', req.user.profile.displayName);
-      //console.log('user email ', req.user.profile.email);
 
-      var userInfo = {
-        first_name: req.user.profile.name.givenName,
-        last_name: req.user.profile.name.familyName,
-        email: req.user.profile.email,
-        user_identity: req.user.profile.id, 
-        displayName: req.user.profile.displayName
-      }
-
-      // sessionstorage.setItem('email', userInfo.email);
-      // seesionstorage.setItem('user_identity', userInfo.user_identity);
-      // sessionstorage.setItem('displayName', userInfo.displayName);
-
-      console.log(userInfo);
-      // check if user alreay in database
-      //app.use(session({secret: 'super duper hidden', cookie: {maxAge: 60000}}));
-      var users = new Users();
-
-      users.getUserByUserIdentity(req.user.profile.id)
-        .then(dbUser => {
-          if (!users.userSelected) {
-            users.getUserByEmail(req.user.profile.eamil)
-              .then(dbUser => {
-                if (!users.userSelected) {
-                  users.createUser(userInfo)
-                    .then(dbUser => {
-                      //setSessionInfo(req.session, users.userInserted);
-                      req.session.user_id = users.userInserted.user_id;
-                      req.session.email = users.userInserted.email.toString();
-                      req.session.user_identity = users.userInserted.user_identity.toString();                  
-                      req.session.displayName = users.userInserted.displayName.toString();
-                    })
-                } 
-                else{
-                  //setSessionInfo(req.session, users.userSelected);
-                  req.session.user_id = users.userSelected.user_id;
-                  req.session.email = users.userSelected.email.toString();
-                  req.session.user_identity = users.userSelected.user_identity.toString();                  
-                  req.session.displayName = users.userSelected.displayName.toString();
-                }
-              })
-          } else{
-            //setSessionInfo(req.session, users.userSelected);
-            req.session.user_id = users.userSelected.user_id;
-            req.session.email = users.userSelected.email.toString();
-            req.session.user_identity = users.userSelected.user_identity.toString();                  
-            req.session.displayName = users.userSelected.displayName.toString();
-          }
-        }).then(() => req.session)
-          .then(reqs =>  {
-            console.log("Inside Auth: ", reqs.user_id, req.session.displayName, 
-              req.session.email, req.session.user_identity);
-            return req.session;
-          })
-          .then (reqs => {
-            res.redirect(url.format({
-              pathname: '/tickets',
-              query: {
-                "user_id": reqs.user_id,
-                "email": reqs.email,
-                "displayName": reqs.displayName,
-                "user_identification": reqs.user_identification
-            }}));
-          });
-
-
-      //console.log('user_id from sessionstorage \n', sessionstorage.getItem('user_id'));
-      //res.redirect('/tickets');
-      //router.get('/tickets', (req, res) => tickets_controller.tickets(req, res));
-      //router.get('/api/tickets', (req, res) => tickets_api_controller.ticketsAll(req, res));
-      //res.sendFile(path.join(__dirname + '/test.html'));
+      console.log('Inside redirect; ' + req.session.user.user_id);
+      console.log('inside auth ', req.session.user.displayName);
+      res.redirect('/tickets');
     }
   );
 
-  // generate a url that asks permissions for Google+ and Google Calendar scopes
-  const scopes = [
-    'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile',
-    'email'
-  ];
 
   /*
   scope: ['https://www.googleapis.com/auth/plus.signin',
@@ -104,83 +33,122 @@ module.exports = (app, passport) => {
     'https://www.googleapis.com/auth/calendar', 
     'https://www.googleapis.com/auth/plus.profile.email']
   */
+  // generate a url that asks permissions for Google+ and Google Calendar scopes
+  const scopes = [
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'email'
+  ];
 
-  app.get('/auth/google', passport.authenticate('google', {
+  // authenticate with google
+  router.get('/auth/google', passport.authenticate('google', {
     scope: scopes
   }));
 
-  app.get('/signin', (req, res) => {
+  router.get('/auth/signin', (req, res) => {
     res.render('signin', {
       user: req.user
     });
   })
 
-  app.get('/signout', (req, res) => {
+  router.get('/auth/signout', (req, res) => {
     req.signout();
     req.session = null;
     res.redirect('/');
   })
 
   // Route to landing page
-  //app.get('/', (req, res) => res.sendFile('donlandingpage', { user: req.user, root : __dirname}));
-  app.get('/', (req, res) => {
-    res.render('../views/index', {
-      user: req.user,
-      root: __dirname
-    })
-  });
+  //router.get('/', (req, res) => res.sendFile('donlandingpage', { user: req.user, root : __dirname}));
+  // router.get('/', (req, res) => {
+  //   res.render('../views/index', {
+  //     user: req.user,
+  //     root: __dirname
+  //   })
+  // });
 
-  app.get('/', ensureAuthenticated, (req, res) => {
-    res.render('/', {
-      user: req.user
-    });
-  })
 
+  // user.id is the id in user table
   passport.serializeUser((user, done) => {
     var sessionUser = {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      roles: user.roles
+      id: user.id,
+      displayName: user.displayName,
+      email: user.email
     };
     done(null, sessionUser);
   });
 
   //The sessionUser is different from database user. it's actually req.session.passport.user and comes from the session collection
   passport.deserializeUser((sessionUser, done) => {
-    done(null, sessionUser);
+    var users = new Users();
+    users.getUserByUserId(sessionUser.id)
+     .then(user => {
+      done(null, user);
+     })   
   });
+
+
+  var callbackURL;
+  if (process.env.NODE_ENV == "heroku_production") {
+    callbackURL = 'https://pacific-fortress-96034.herokuapp.com/auth/google/callback';
+  } else {
+    callbackURL = 'http://localhost:8080/auth/google/callback';
+  }
 
   passport.use(new GoogleStrategy({
       clientID: process.env.CLIENT_ID,
       clientSecret: process.env.CLIENT_SECRET,
-      callbackURL: '/auth/google/callback',
+      callbackURL: callbackURL,
       passReqToCallback: true
     },
-    (request, accessToken, refreshToken, profile, done) => {
-      process.nextTick(() => {
-        return done(null, {
-          profile: profile,
-          accessToken: accessToken
-        });
-      });
-    }));
+    (req, accessToken, refreshToken, profile, done) => {
+      // check if this user exists in the user table
+      var users = new Users();
+      users.getUserByUserIdentity(profile.id)
+      .then(currentUser => {
+        if(currentUser) {
+          // found in the table
+          console.log('user exists and is ' + currentUser);
 
-  function ensureAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) {
-      return next();
-    }
-    res.redirect('/signin');
-  }
+          var user = {
+            user_identity: currentUser.user_identity,
+            displayName: currentUser.displayName,
+            user_id: currentUser.user_id,
+            email: currentUser.email
+           }
 
-  function setSessionInfo(sess, userInfo) {
-    sess.user_id = userInfo.user_id;
-    sess.email = userInfo.email.toString();
-    sess.user_identity = userInfo.user_identity.toString();                  
-    sess.displayName = userInfo.displayName.toString();
-    console.log("session data: \n", sess.user_id, sess.email, sess.user_identity, sess.displayName);
-    return sess;
-  }
+           req.session.user = user; 
+           done(null, currentUser);
 
+        } else {
+          // if not, create user
+          var newUser = new User({
+            first_name: profile.givenName,
+            last_name: profile.familyName, 
+            email: profile.email,
+            user_identity: profile.id,
+            displayName: profile.displayName
+          });
 
-};
+          users.createUser(newUser)
+           .then(newUser => {
+             console.log('new user created: ' + newUser);
+
+             var user = {
+              user_identity: newUser.user_identity,
+              displayName: newUser.displayName,
+              user_id: newUser.user_id,
+              email: newUser.email
+             }
+
+             req.session.user = user;
+
+             done(null, newUser);
+           })
+        }
+      })
+
+      
+    })
+  );
+
+module.exports = router;
